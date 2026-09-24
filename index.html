@@ -372,9 +372,9 @@
             // 2. Calculate Taxes & Net (deducting pre-tax dollars)
             let taxes = calcTax(annualGross, status, state, contrib401k);
             let netAnnual = annualGross - taxes.total - contrib401k;
-            currentNetMonthly = netAnnual / 12;
+            currentNetMonthly = Math.round(netAnnual / 12); // Rounded to eliminate floating-point jumps
             
-            document.getElementById('takeHomeReadout').innerText = `$${currentNetMonthly.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+            document.getElementById('takeHomeReadout').innerText = `$${currentNetMonthly.toLocaleString()}`;
 
             // 3. Aggregate Budget Data
             let totalBudgeted = 0;
@@ -399,17 +399,21 @@
             let leftover = currentNetMonthly - totalBudgeted;
 
             // 4. Update UI Values
-            document.getElementById('totalBudgetedUI').innerText = `$${totalBudgeted.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+            document.getElementById('totalBudgetedUI').innerText = `$${totalBudgeted.toLocaleString()}`;
             
             let lUI = document.getElementById('leftoverUI');
             let lLabel = document.getElementById('leftoverLabel');
             
             if (leftover < 0) {
-                lUI.innerText = `-$${Math.abs(leftover).toLocaleString(undefined, {maximumFractionDigits:0})}`;
+                lUI.innerText = `-$${Math.abs(leftover).toLocaleString()}`;
                 lUI.className = "text-lg font-bold text-red-600 dark:text-red-400";
                 lLabel.innerText = "Over Budget By";
+            } else if (leftover === 0) {
+                lUI.innerText = `$0`;
+                lUI.className = "text-lg font-bold text-yellow-500 dark:text-yellow-400";
+                lLabel.innerText = "Perfectly Balanced";
             } else {
-                lUI.innerText = `$${leftover.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+                lUI.innerText = `$${leftover.toLocaleString()}`;
                 lUI.className = "text-lg font-bold text-green-600 dark:text-green-400";
                 lLabel.innerText = "Unallocated Cash";
             }
