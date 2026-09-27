@@ -111,6 +111,16 @@
                             </div>
                         </div>
 
+                        <!-- 401k SLIDER -->
+                        <div class="pt-2 border-t border-gray-200 dark:border-darkBorder mb-2">
+                            <label class="block text-sm font-medium mb-1 flex justify-between">
+                                <span>401k Pre-tax</span>
+                                <span id="budget401kLabel" class="text-xs text-blue-600 font-bold">$0 (0%)</span>
+                            </label>
+                            <input type="range" id="budget401kPct" min="0" max="100" value="0" class="w-full accent-blue-500" oninput="calculate()">
+                        </div>
+
+
                         <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 text-center">
                             <p class="text-sm text-blue-600 dark:text-blue-400 font-semibold">Estimated Monthly Take-Home</p>
                             <p class="text-2xl font-bold text-blue-700 dark:text-blue-300" id="takeHomeReadout">$0</p>
@@ -352,7 +362,7 @@
             calculate();
         }
 
-        function calculate() {
+                function calculate() {
             let state = document.getElementById('state').value;
             let status = document.getElementById('filingStatus').value;
             let payType = document.getElementById('payType').value;
@@ -366,7 +376,35 @@
                 annualGross = (Math.min(hrs, 40) * wage + Math.max(0, hrs - 40) * wage * 1.5) * 52;
             }
 
-            let taxable = Math.max(0, annualGross);
+            // --- 401k Dynamic Slider Logic ---
+            let cap401k = status === 'joint' ? 48000 : 24000;
+            let slider = document.getElementById('budget401kPct');
+            
+            // Dynamically lock the slider's physical maximum based on current income
+            let maxPct = annualGross > 0 ? Math.ceil((cap401k / annualGross) * 100) : 100;
+            if (maxPct > 100) maxPct = 100;
+            
+            slider.max = maxPct;
+            if (parseInt(slider.value) > maxPct) {
+                slider.value = maxPct;
+            }
+            
+            let pct401k = parseInt(slider.value) / 100;
+            let rawContrib = annualGross * pct401k;
+            let contrib401k = Math.min(rawContrib, cap401k);
+            let effectivePct = annualGross > 0 ? (contrib401k / annualGross) * 100 : 0;
+            
+            let label401k = document.getElementById('budget401kLabel');
+            if (contrib401k >= cap401k && cap401k > 0) {
+                label401k.innerText = `$${contrib401k.toLocaleString(undefined, {maximumFractionDigits:0})} (${effectivePct.toFixed(0)}%) (MAXED)`;
+                label401k.className = "text-xs text-red-500 font-bold";
+            } else {
+                label401k.innerText = `$${contrib401k.toLocaleString(undefined, {maximumFractionDigits:0})} (${effectivePct.toFixed(0)}%)`;
+                label401k.className = "text-xs text-blue-600 font-bold";
+            }
+
+            // --- Tax & Net Income Math ---
+            let taxable = Math.max(0, annualGross - contrib401k); // 401k reduces taxable income
             let fed = 0;
             let brackets = status === 'joint' ? [[23200, 0.1], [94300, 0.12], [201050, 0.22], [383900, 0.24], [487450, 0.32], [731200, 0.35], [Infinity, 0.37]] : [[11600, 0.1], [47150, 0.12], [100525, 0.22], [191950, 0.24], [243725, 0.32], [365600, 0.35], [Infinity, 0.37]];
             let prev = 0;
@@ -375,12 +413,16 @@
                 prev = b;
             }
             let st = taxable * (stateTaxes[state] || 0.05);
-            let fica = Math.min(taxable, 168600) * 0.0765 + Math.max(0, taxable - 168600) * 0.0145;
             
-            let netAnnual = annualGross - (fed + st + fica);
+            // FICA applies to gross income before 401k deductions
+            let grossForFica = Math.max(0, annualGross);
+            let fica = Math.min(grossForFica, 168600) * 0.0765 + Math.max(0, grossForFica - 168600) * 0.0145;
+            
+            let netAnnual = annualGross - (fed + st + fica) - contrib401k;
             currentNetMonthly = Math.round(netAnnual / 12);
             document.getElementById('takeHomeReadout').innerText = `$${currentNetMonthly.toLocaleString()}`;
 
+            // --- Budget Allocation Math ---
             let totalPlanned = 0, totalActual = 0;
             let chartData = [], chartLabels = [], chartColors = [];
 
