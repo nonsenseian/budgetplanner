@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" type="image/png" href="https://nonsenseian.github.io/nonsenseian_logo.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nonsenseian | Budget Planner</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -20,8 +20,11 @@
             }
         }
     </script>
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://nonsenseian.github.io/global-components.js"></script>
+    <!-- HTML2Canvas for Snapshot Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://nonsenseian.github.io/global-components.js?v=2"></script>
 
     <style>
         body { transition: background-color 0.3s ease, color 0.3s ease; }
@@ -33,25 +36,25 @@
             background-color: #374151; border-color: #4B5563; color: #F3F4F6;
         }
         .input-field:focus { outline: none; border-color: #3B82F6; ring: 2px; }
+        
+        /* Snapshot hidden canvas to prevent layout shift */
+        #snapshotWrapper { position: absolute; left: -9999px; top: 0; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 dark:bg-darkBg dark:text-gray-100 font-sans min-h-screen flex flex-col">
 
-    <!-- Main Container -->
     <main class="flex-grow max-w-7xl mx-auto w-full p-4 md:p-8 block">
         
-        <!-- Tool Title -->
         <div class="mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">
                 Dynamic Budget Planner
             </h1>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">Calculate your take-home pay and allocate your cash.</p>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">Plan your cash flow and track actual spending.</p>
         </div>
 
-        <!-- Changed from xl to lg to trigger side-by-side earlier, and added w-full to force expansion -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
             
-            <!-- Left Column: Inputs -->
+            <!-- Left Column: Income & Snapshot Settings -->
             <div class="lg:col-span-1 space-y-6 w-full">
                 
                 <!-- Income & Tax Assumptions -->
@@ -88,7 +91,6 @@
                             </select>
                         </div>
 
-                        <!-- Salary Block -->
                         <div id="salaryBlock" class="space-y-4">
                             <div>
                                 <label class="block text-sm font-medium mb-1">Annual Salary ($)</label>
@@ -96,7 +98,6 @@
                             </div>
                         </div>
 
-                        <!-- Hourly Block -->
                         <div id="hourlyBlock" class="hidden space-y-4">
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -104,31 +105,10 @@
                                     <input type="number" id="hourlyWage" class="input-field" value="45" min="0" oninput="calculate()">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium mb-1">Hrs/Week (Max 168)</label>
+                                    <label class="block text-sm font-medium mb-1">Hrs/Week</label>
                                     <input type="number" id="hoursPerWeek" class="input-field" value="40" min="0" max="168" oninput="calculate()">
                                 </div>
                             </div>
-                            <div class="pt-2">
-                                <label class="block text-sm font-medium mb-1 flex justify-between">
-                                    <span>Overtime Multiplier</span>
-                                    <span id="otLabel" class="text-xs text-blue-600 font-bold">1.5x</span>
-                                </label>
-                                <input type="range" id="otMultiplier" min="1" max="2" step="0.1" value="1.5" class="w-full" oninput="calculate()">
-                                <p class="text-xs text-gray-500 mt-1">Applies to hours worked over 40/week.</p>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Additional Monthly Pay ($)</label>
-                            <input type="number" id="additionalPay" class="input-field" value="0" min="0" oninput="calculate()">
-                        </div>
-
-                        <div class="pt-2 border-t dark:border-darkBorder mb-2">
-                            <label class="block text-sm font-medium mb-1 flex justify-between">
-                                <span>401k Pre-tax (%)</span>
-                                <span id="budget401kLabel" class="text-xs text-blue-600 font-bold">0% / $0</span>
-                            </label>
-                            <input type="range" id="budget401kPct" min="0" max="100" value="0" class="w-full" oninput="calculate()">
                         </div>
 
                         <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 text-center">
@@ -137,142 +117,218 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Snapshot Tools -->
+                <div class="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-6 rounded-xl shadow-md border border-purple-200 dark:border-gray-700">
+                    <h2 class="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Export Snapshot 📸</h2>
+                    <p class="text-xs text-gray-500 mb-4">Fill out your goals and export a clean image of this month's budget.</p>
+                    
+                    <div class="space-y-3">
+                        <input type="text" id="snapMonth" class="input-field text-sm" placeholder="Month (e.g. October 2026)">
+                        <textarea id="snapGoals" class="input-field text-sm h-16" placeholder="Financial Goals..."></textarea>
+                        <textarea id="snapNotes" class="input-field text-sm h-16" placeholder="Additional Notes..."></textarea>
+                        
+                        <div class="flex gap-2">
+                            <select id="snapFormat" class="input-field text-sm w-1/2">
+                                <option value="vertical">Vertical (Phone)</option>
+                                <option value="horizontal">Horizontal (PC)</option>
+                            </select>
+                            <button onclick="generateSnapshot()" class="w-1/2 bg-purple-600 text-white font-bold rounded shadow hover:bg-purple-700 transition-colors text-sm">
+                                Export Image
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Middle Column: Budget Allocation -->
+            <!-- Middle Column: Planned vs Actual Input Grid -->
             <div class="xl:col-span-1 space-y-6">
                 <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border dark:border-darkBorder">
                     <div class="flex justify-between items-center border-b pb-2 mb-4 border-gray-200 dark:border-darkBorder">
-                        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Budget Categories</h2>
+                        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Budget Flow</h2>
                         <button onclick="autoFillBudget()" class="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded shadow transition-colors">
-                            ✨ Auto-Fill Empty
+                            ✨ Auto-Fill Planned
                         </button>
                     </div>
                     
-                    <p class="text-xs text-gray-500 mb-4">Assign monthly dollar amounts to your lifestyle. Leave categories empty and hit Auto-Fill to generate a random proportional budget.</p>
-                    
+                    <!-- Table Headers -->
+                    <div class="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-gray-400 mb-3 px-1">
+                        <div class="col-span-4">Category</div>
+                        <div class="col-span-4 text-center">Planned</div>
+                        <div class="col-span-4 text-center">Actual</div>
+                    </div>
+
                     <div class="space-y-3" id="budgetInputsContainer">
                         <!-- Inputs generated by JS -->
+                    </div>
+
+                    <!-- Custom Category Adder -->
+                    <div class="mt-6 pt-4 border-t border-gray-200 dark:border-darkBorder">
+                        <label class="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Add Custom Category</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="newCatName" class="input-field text-sm" placeholder="e.g. Daycare, Debts, etc.">
+                            <button onclick="addCustomCategory()" class="bg-blue-600 text-white px-4 rounded text-sm font-bold shadow hover:bg-blue-700">Add</button>
+                        </div>
+                        <p id="customCatError" class="text-xs text-red-500 mt-1 hidden">Max 5 custom categories reached.</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column: Charts & Insights -->
+            <!-- Right Column: Charts & Status -->
             <div class="xl:col-span-1 space-y-6">
                 
-                <!-- Status Box -->
                 <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border dark:border-darkBorder text-center">
-                    <h2 class="text-xl font-bold mb-2">Budget Status</h2>
-                    <div class="grid grid-cols-2 gap-4 pt-2 border-b dark:border-darkBorder pb-4 mb-4">
-                        <div>
-                            <p class="text-xs text-gray-500">Total Budgeted</p>
-                            <p class="text-lg font-bold" id="totalBudgetedUI">$0</p>
+                    <h2 class="text-xl font-bold mb-4">Budget Status</h2>
+                    <div class="grid grid-cols-2 gap-4 pb-4 mb-4 border-b dark:border-darkBorder">
+                        <div class="bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-700">
+                            <p class="text-[10px] uppercase font-bold text-gray-500">Planned Leftover</p>
+                            <p class="text-lg font-black" id="leftoverPlannedUI">$0</p>
                         </div>
-                        <div>
-                            <p class="text-xs text-gray-500" id="leftoverLabel">Unallocated Cash</p>
-                            <p class="text-lg font-bold" id="leftoverUI">$0</p>
+                        <div class="bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-700">
+                            <p class="text-[10px] uppercase font-bold text-gray-500">Actual Leftover</p>
+                            <p class="text-lg font-black" id="leftoverActualUI">$0</p>
                         </div>
                     </div>
                     
-                    <!-- Chart -->
                     <div class="relative w-full aspect-square max-w-[250px] mx-auto">
                         <canvas id="budgetChart"></canvas>
                     </div>
-                </div>
-
-                <!-- Insights Box -->
-                <div class="bg-gray-100 dark:bg-gray-800 p-6 rounded-xl border dark:border-darkBorder space-y-3">
-                    <h3 class="font-bold uppercase tracking-wider text-gray-500 text-xs">AI Insights & Benchmarks</h3>
-                    <ul class="text-sm text-gray-700 dark:text-gray-300 space-y-2 list-disc pl-4" id="insightsList">
-                        <!-- Dynamic Insights generated by JS -->
-                    </ul>
                 </div>
 
             </div>
         </div>
     </main>
 
-    <script>
+    <!-- Hidden Wrapper for Snapshot Generation -->
+    <div id="snapshotWrapper">
+        <div id="snapshotCanvas" class="bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900 p-8 rounded-xl shadow-2xl font-sans" style="width: 1000px;">
+            <!-- Dynamic HTML built before export -->
+        </div>
+    </div>
 
+    <script>
         // -----------------------
-        // GLOBAL DATA & CONSTANTS
+        // GLOBAL DATA & DICTIONARIES
         // -----------------------
         let budgetChart;
         const stateTaxes = { 'AL': 0.04, 'CA': 0.08, 'FL': 0, 'NY': 0.06, 'TX': 0, 'WA': 0, 'OTHER': 0.05 };
-        const averageRents = { 'AL': 1200, 'CA': 2850, 'FL': 2100, 'NY': 2600, 'TX': 1750, 'WA': 2050, 'OTHER': 1800 };
+        let currentNetMonthly = 0;
         
-        // Budget Categories definition
-        const categories = [
-            { id: 'catHousing', label: 'Housing 🏠', color: '#3B82F6', weight: 0.30 }, // Base ideal weights for auto-fill
-            { id: 'catGroceries', label: 'Groceries 🛒', color: '#10B981', weight: 0.10 },
-            { id: 'catDining', label: 'Dining 🍽️', color: '#F59E0B', weight: 0.08 },
-            { id: 'catTransport', label: 'Transportation 🚗', color: '#6366F1', weight: 0.12 },
-            { id: 'catUtilities', label: 'Utilities 💡', color: '#F43F5E', weight: 0.07 },
-            { id: 'catEntertainment', label: 'Entertainment 🍿', color: '#8B5CF6', weight: 0.05 },
-            { id: 'catTravel', label: 'Travel ✈️', color: '#06B6D4', weight: 0.05 },
-            { id: 'catShopping', label: 'Shopping 🛍️', color: '#EC4899', weight: 0.05 },
-            { id: 'catMisc', label: 'Misc. 🧩', color: '#64748B', weight: 0.05 },
-            { id: 'catSavings', label: 'Savings 💰', color: '#22C55E', weight: 0.10 },
-            { id: 'catInvesting', label: 'Investing 📈', color: '#14B8A6', weight: 0.08 }
+        // Base categories
+        let categories = [
+            { id: 'catHousing', label: 'Housing 🏠', color: '#3B82F6', weight: 0.30, isCustom: false },
+            { id: 'catGroceries', label: 'Groceries 🛒', color: '#10B981', weight: 0.10, isCustom: false },
+            { id: 'catDining', label: 'Dining 🍽️', color: '#F59E0B', weight: 0.08, isCustom: false },
+            { id: 'catTransport', label: 'Transportation 🚗', color: '#6366F1', weight: 0.12, isCustom: false },
+            { id: 'catUtilities', label: 'Utilities 💡', color: '#F43F5E', weight: 0.07, isCustom: false },
+            { id: 'catWellness', label: 'Health & Wellness 🫀', color: '#E11D48', weight: 0.05, isCustom: false },
+            { id: 'catEntertainment', label: 'Entertainment 🍿', color: '#8B5CF6', weight: 0.05, isCustom: false },
+            { id: 'catTravel', label: 'Travel ✈️', color: '#06B6D4', weight: 0.05, isCustom: false },
+            { id: 'catShopping', label: 'Shopping 🛍️', color: '#EC4899', weight: 0.05, isCustom: false },
+            { id: 'catMisc', label: 'Misc. 🧩', color: '#64748B', weight: 0.05, isCustom: false },
+            { id: 'catSavings', label: 'Savings 💰', color: '#22C55E', weight: 0.10, isCustom: false },
+            { id: 'catInvesting', label: 'Investing 📈', color: '#14B8A6', weight: 0.08, isCustom: false }
         ];
 
-        // Generate Budget Inputs dynamically
-        const container = document.getElementById('budgetInputsContainer');
-        categories.forEach(c => {
-            container.innerHTML += `
-                <div class="flex items-center space-x-3">
-                    <label class="w-1/2 text-sm font-medium">${c.label}</label>
-                    <div class="relative w-1/2">
-                        <span class="absolute left-3 top-2 text-gray-500">$</span>
-                        <input type="number" id="${c.id}" class="input-field pl-7 cat-input" placeholder="0" min="0" oninput="calculate()">
-                    </div>
-                </div>
-            `;
-        });
+        // Custom Category Inference Dictionary
+        const customColors = ['#F97316', '#14B8A6', '#8B5CF6', '#F43F5E', '#EAB308'];
+        const emojiMap = {
+            'pet': '🐶', 'dog': '🐶', 'cat': '🐱', 'vet': '🩺', 
+            'kid': '👶', 'child': '👶', 'baby': '👶', 'son': '👶', 'daycare': '🧸', 'school': '🏫', 
+            'car': '🚗', 'mazda': '🚗', 'auto': '🚗', 'gas': '⛽', 'toll': '🛣️',
+            'loan': '🏦', 'debt': '💳', 'credit': '💳', 'mortgage': '🏠',
+            'gift': '🎁', 'charity': '🤝', 'donation': '🤝',
+            'clothes': '👕', 'beauty': '💅', 'hair': '✂️', 'salon': '✂️',
+            'game': '🎮', 'sub': '🔄', 'gym': '🏋️', 'insurance': '🛡️'
+        };
 
         // -----------------------
-        // LOGIC FUNCTIONS
+        // UI RENDERING
+        // -----------------------
+        function renderCategoryGrid() {
+            const container = document.getElementById('budgetInputsContainer');
+            container.innerHTML = '';
+            
+            categories.forEach(c => {
+                const deleteBtn = c.isCustom ? `<button onclick="removeCustomCategory('${c.id}')" class="absolute -left-4 top-2 text-red-500 hover:text-red-700 text-xs">✕</button>` : '';
+                
+                container.innerHTML += `
+                    <div class="grid grid-cols-12 gap-2 items-center relative">
+                        ${deleteBtn}
+                        <label class="col-span-4 text-xs font-semibold truncate pr-1" title="${c.label}">${c.label}</label>
+                        <div class="col-span-4 relative">
+                            <span class="absolute left-2 top-[6px] text-gray-400 text-xs">$</span>
+                            <input type="number" id="${c.id}_planned" class="input-field pl-5 py-1 text-sm font-semibold" placeholder="0" oninput="calculate()">
+                        </div>
+                        <div class="col-span-4 relative">
+                            <span class="absolute left-2 top-[6px] text-gray-400 text-xs">$</span>
+                            <input type="number" id="${c.id}_actual" class="input-field pl-5 py-1 text-sm font-semibold" placeholder="0" oninput="calculate()">
+                        </div>
+                    </div>
+                `;
+            });
+            calculate();
+        }
+
+        function addCustomCategory() {
+            const customCount = categories.filter(c => c.isCustom).length;
+            if (customCount >= 5) {
+                document.getElementById('customCatError').classList.remove('hidden');
+                return;
+            }
+
+            const input = document.getElementById('newCatName');
+            const name = input.value.trim();
+            if (!name) return;
+
+            // Infer Emoji
+            let emoji = '📌'; // Fallback
+            const lowerName = name.toLowerCase();
+            for (const key in emojiMap) {
+                if (lowerName.includes(key)) {
+                    emoji = emojiMap[key];
+                    break;
+                }
+            }
+
+            categories.push({
+                id: 'catCustom_' + Date.now(),
+                label: `${name} ${emoji}`,
+                color: customColors[customCount],
+                weight: 0.05,
+                isCustom: true
+            });
+
+            input.value = '';
+            document.getElementById('customCatError').classList.add('hidden');
+            renderCategoryGrid();
+        }
+
+        function removeCustomCategory(id) {
+            categories = categories.filter(c => c.id !== id);
+            document.getElementById('customCatError').classList.add('hidden');
+            renderCategoryGrid();
+        }
+
+        // -----------------------
+        // LOGIC & MATH
         // -----------------------
         function togglePayType() {
             let type = document.getElementById('payType').value;
-            if (type === 'salary') {
-                document.getElementById('salaryBlock').classList.remove('hidden');
-                document.getElementById('hourlyBlock').classList.add('hidden');
-            } else {
-                document.getElementById('salaryBlock').classList.add('hidden');
-                document.getElementById('hourlyBlock').classList.remove('hidden');
-            }
+            document.getElementById('salaryBlock').classList.toggle('hidden', type !== 'salary');
+            document.getElementById('hourlyBlock').classList.toggle('hidden', type === 'salary');
         }
-
-        function calcTax(gross, status, state, preTax = 0) {
-            let taxable = Math.max(0, gross - preTax);
-            let fica = Math.min(taxable, 168600) * 0.0765 + Math.max(0, taxable - 168600) * 0.0145;
-            let fed = 0;
-            // Simplified 2024 brackets (matches Buy vs Rent)
-            let brackets = status === 'joint' ? 
-                [[23200, 0.1], [94300, 0.12], [201050, 0.22], [383900, 0.24], [487450, 0.32], [731200, 0.35], [Infinity, 0.37]] : 
-                [[11600, 0.1], [47150, 0.12], [100525, 0.22], [191950, 0.24], [243725, 0.32], [365600, 0.35], [Infinity, 0.37]];
-            let prev = 0;
-            for (let [b, r] of brackets) {
-                if (taxable > prev) fed += (Math.min(taxable, b) - prev) * r;
-                prev = b;
-            }
-            let st = taxable * (stateTaxes[state] || 0.05);
-            return { fed, st, fica, total: fed + st + fica };
-        }
-
-        // Global variable to store current Net Income for auto-fill logic
-        let currentNetMonthly = 0;
 
         function autoFillBudget() {
             if (currentNetMonthly <= 0) return;
             
-            // Find which inputs are empty and sum what is already filled
             let filledSum = 0;
             let emptyCategories = [];
             
             categories.forEach(c => {
-                let val = document.getElementById(c.id).value;
+                let el = document.getElementById(c.id + '_planned');
+                let val = el ? el.value : "";
                 if (val === "" || val === "0") {
                     emptyCategories.push(c);
                 } else {
@@ -281,36 +337,25 @@
             });
 
             let remainingCash = currentNetMonthly - filledSum;
-            
-            if (emptyCategories.length === 0 || remainingCash <= 0) {
-                return; // Nothing to fill or no money left
-            }
+            if (emptyCategories.length === 0 || remainingCash <= 0) return;
 
-            // Generate randomized weights for empty categories (varies +/- 30% from base ideal)
             let totalEmptyWeight = 0;
             emptyCategories.forEach(c => {
-                let randomVariance = (Math.random() * 0.6) + 0.7; // 0.7 to 1.3
-                c.currentWeight = c.weight * randomVariance;
+                c.currentWeight = c.weight * ((Math.random() * 0.6) + 0.7);
                 totalEmptyWeight += c.currentWeight;
             });
 
-            // Distribute remaining cash based on normalized randomized weights
             emptyCategories.forEach(c => {
                 let proportion = c.currentWeight / totalEmptyWeight;
-                let allocated = Math.round(remainingCash * proportion);
-                document.getElementById(c.id).value = allocated;
+                document.getElementById(c.id + '_planned').value = Math.round(remainingCash * proportion);
             });
-
-            calculate(); // Recalculate UI
+            calculate();
         }
 
         function calculate() {
-            // 1. Calculate Gross Income
             let state = document.getElementById('state').value;
             let status = document.getElementById('filingStatus').value;
             let payType = document.getElementById('payType').value;
-            let addPay = parseFloat(document.getElementById('additionalPay').value) || 0;
-            
             let annualGross = 0;
 
             if (payType === 'salary') {
@@ -318,146 +363,70 @@
             } else {
                 let wage = parseFloat(document.getElementById('hourlyWage').value) || 0;
                 let hrs = parseFloat(document.getElementById('hoursPerWeek').value) || 0;
-                if (hrs > 168) hrs = 168;
-                document.getElementById('hoursPerWeek').value = hrs; // visual cap enforcement
-                
-                let otMult = parseFloat(document.getElementById('otMultiplier').value) || 1.5;
-                document.getElementById('otLabel').innerText = `${otMult}x`;
-                
-                let regHrs = Math.min(hrs, 40);
-                let otHrs = Math.max(0, hrs - 40);
-                let weeklyPay = (regHrs * wage) + (otHrs * wage * otMult);
-                annualGross = weeklyPay * 52;
+                annualGross = (Math.min(hrs, 40) * wage + Math.max(0, hrs - 40) * wage * 1.5) * 52;
             }
 
-            // Include additional monthly pay
-            annualGross += (addPay * 12);
-
-            // 401k Calculation (capped by filing status limits)
-            let pct401k = parseFloat(document.getElementById('budget401kPct').value) / 100;
-            let cap401k = status === 'joint' ? 48000 : 24000;
-            let contrib401k = Math.min(annualGross * pct401k, cap401k);
+            let taxable = Math.max(0, annualGross);
+            let fed = 0;
+            let brackets = status === 'joint' ? [[23200, 0.1], [94300, 0.12], [201050, 0.22], [383900, 0.24], [487450, 0.32], [731200, 0.35], [Infinity, 0.37]] : [[11600, 0.1], [47150, 0.12], [100525, 0.22], [191950, 0.24], [243725, 0.32], [365600, 0.35], [Infinity, 0.37]];
+            let prev = 0;
+            for (let [b, r] of brackets) {
+                if (taxable > prev) fed += (Math.min(taxable, b) - prev) * r;
+                prev = b;
+            }
+            let st = taxable * (stateTaxes[state] || 0.05);
+            let fica = Math.min(taxable, 168600) * 0.0765 + Math.max(0, taxable - 168600) * 0.0145;
             
-            let label401k = document.getElementById('budget401kLabel');
-            label401k.innerText = contrib401k >= cap401k ? `$${contrib401k.toLocaleString(undefined,{maximumFractionDigits:0})} (MAXED)` : `${(pct401k * 100).toFixed(0)}% / $${contrib401k.toLocaleString(undefined,{maximumFractionDigits:0})}`;
-            label401k.className = contrib401k >= cap401k ? "text-xs text-red-500 font-bold" : "text-xs text-blue-600 font-bold";
-
-            // 2. Calculate Taxes & Net (deducting pre-tax dollars)
-            let taxes = calcTax(annualGross, status, state, contrib401k);
-            let netAnnual = annualGross - taxes.total - contrib401k;
-            currentNetMonthly = Math.round(netAnnual / 12); // Rounded to eliminate floating-point jumps
-            
+            let netAnnual = annualGross - (fed + st + fica);
+            currentNetMonthly = Math.round(netAnnual / 12);
             document.getElementById('takeHomeReadout').innerText = `$${currentNetMonthly.toLocaleString()}`;
 
-            // 3. Aggregate Budget Data
-            let totalBudgeted = 0;
-            let chartData = [];
-            let chartLabels = [];
-            let chartColors = [];
-
-            let houseVal = 0, foodVal = 0; // For insights
+            let totalPlanned = 0, totalActual = 0;
+            let chartData = [], chartLabels = [], chartColors = [];
 
             categories.forEach(c => {
-                let val = parseFloat(document.getElementById(c.id).value) || 0;
-                totalBudgeted += val;
-                if (val > 0) {
-                    chartData.push(val);
+                let elP = document.getElementById(c.id + '_planned');
+                let elA = document.getElementById(c.id + '_actual');
+                let valP = elP ? parseFloat(elP.value) || 0 : 0;
+                let valA = elA ? parseFloat(elA.value) || 0 : 0;
+                
+                totalPlanned += valP;
+                totalActual += valA;
+
+                if (valP > 0) {
+                    chartData.push(valP);
                     chartLabels.push(c.label);
                     chartColors.push(c.color);
                 }
-                if (c.id === 'catHousing') houseVal = val;
-                if (c.id === 'catDining' || c.id === 'catGroceries') foodVal += val;
             });
 
-            let leftover = currentNetMonthly - totalBudgeted;
+            let leftPlanned = currentNetMonthly - totalPlanned;
+            let leftActual = currentNetMonthly - totalActual;
 
-            // 4. Update UI Values
-            document.getElementById('totalBudgetedUI').innerText = `$${totalBudgeted.toLocaleString()}`;
-            
-            let lUI = document.getElementById('leftoverUI');
-            let lLabel = document.getElementById('leftoverLabel');
-            
-            if (leftover < 0) {
-                lUI.innerText = `-$${Math.abs(leftover).toLocaleString()}`;
-                lUI.className = "text-lg font-bold text-red-600 dark:text-red-400";
-                lLabel.innerText = "Over Budget By";
-            } else if (leftover === 0) {
-                lUI.innerText = `$0`;
-                lUI.className = "text-lg font-bold text-yellow-500 dark:text-yellow-400";
-                lLabel.innerText = "Perfectly Balanced";
-            } else {
-                lUI.innerText = `$${leftover.toLocaleString()}`;
-                lUI.className = "text-lg font-bold text-green-600 dark:text-green-400";
-                lLabel.innerText = "Unallocated Cash";
-            }
+            let uiP = document.getElementById('leftoverPlannedUI');
+            uiP.innerText = leftPlanned < 0 ? `-$${Math.abs(leftPlanned).toLocaleString()}` : `$${leftPlanned.toLocaleString()}`;
+            uiP.className = leftPlanned < 0 ? "text-lg font-black text-red-600 dark:text-red-400" : "text-lg font-black text-blue-600 dark:text-blue-400";
 
-            // 5. Draw Pie Chart
-            drawChart(chartLabels, chartData, chartColors);
+            let uiA = document.getElementById('leftoverActualUI');
+            uiA.innerText = leftActual < 0 ? `-$${Math.abs(leftActual).toLocaleString()}` : `$${leftActual.toLocaleString()}`;
+            uiA.className = leftActual < 0 ? "text-lg font-black text-red-600 dark:text-red-400" : "text-lg font-black text-green-600 dark:text-green-400";
 
-            // 6. Generate Dynamic Insights
-            generateInsights(leftover, currentNetMonthly, state, houseVal, foodVal);
-        }
-
-        function drawChart(labels, data, colors) {
             if (budgetChart) budgetChart.destroy();
             let ctx = document.getElementById('budgetChart').getContext('2d');
-            
-            let textColor = document.documentElement.classList.contains('dark') ? '#E5E7EB' : '#374151';
-            let borderColor = document.documentElement.classList.contains('dark') ? '#1F2937' : '#ffffff';
-
             budgetChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: colors,
-                        borderColor: borderColor,
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let val = context.raw;
-                                    let pct = ((val / currentNetMonthly) * 100).toFixed(1);
-                                    return ` $${val.toLocaleString()} (${pct}% of Net)`;
-                                }
-                            }
-                        }
-                    }
-                },
-                // Custom Plugin to draw emojis on the slices
+                data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors, borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
                 plugins: [{
                     id: 'sliceEmojis',
                     afterDatasetsDraw(chart) {
-                        const ctx = chart.ctx;
-                        chart.getDatasetMeta(0).data.forEach((datapoint, index) => {
-                            // Grab the category label and extract just the emoji at the end
-                            let label = chart.data.labels[index];
-                            let emoji = label.split(' ').pop(); 
-                            
-                            // Get the X and Y coordinates for the center of the slice
-                            let center = datapoint.tooltipPosition();
-                            
-                            // Only draw the emoji if the slice is wide enough to fit it (circumference > ~8 degrees)
-                            if (datapoint.circumference > 0.15) {
-                                ctx.save();
-                                ctx.font = '18px sans-serif'; 
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
-                                
-                                // Add a subtle shadow so the emoji is readable on any background color
-                                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                                ctx.shadowBlur = 4;
-                                
-                                ctx.fillText(emoji, center.x, center.y);
-                                ctx.restore();
+                        const c = chart.ctx;
+                        chart.getDatasetMeta(0).data.forEach((dp, i) => {
+                            if (dp.circumference > 0.15) {
+                                c.save(); c.font = '16px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+                                c.shadowColor = 'rgba(0,0,0,0.4)'; c.shadowBlur = 4;
+                                c.fillText(chart.data.labels[i].split(' ').pop(), dp.tooltipPosition().x, dp.tooltipPosition().y);
+                                c.restore();
                             }
                         });
                     }
@@ -465,47 +434,127 @@
             });
         }
 
-        function generateInsights(leftover, net, state, houseVal, foodVal) {
-            let list = document.getElementById('insightsList');
-            let html = "";
+        // -----------------------
+        // SNAPSHOT EXPORT ENGINE
+        // -----------------------
+        async function generateSnapshot() {
+            const format = document.getElementById('snapFormat').value;
+            const monthText = document.getElementById('snapMonth').value || "Budget Snapshot";
+            const goalsText = document.getElementById('snapGoals').value || "No goals listed.";
+            const notesText = document.getElementById('snapNotes').value || "";
 
-            // Over/Under Budget Insight
-            if (leftover < 0) {
-                html += `<li class="text-red-600 dark:text-red-400 font-semibold">⚠️ You are currently over budget by $${Math.abs(leftover).toLocaleString(undefined, {maximumFractionDigits:0})}. Consider reducing variable costs like Dining or Entertainment.</li>`;
-            } else if (leftover > (net * 0.2)) {
-                html += `<li>You have a massive unallocated surplus! Consider bumping up your <strong>Investing 📈</strong> or <strong>Savings 💰</strong> to maximize wealth.</li>`;
-            } else {
-                html += `<li>Your budget is well-balanced. You are successfully tracking almost all of your monthly income.</li>`;
-            }
+            const wrap = document.getElementById('snapshotCanvas');
+            
+            // Build Table Rows
+            let tableHTML = '';
+            let totalP = 0, totalA = 0;
+            
+            categories.forEach(c => {
+                let valP = parseFloat(document.getElementById(c.id + '_planned').value) || 0;
+                let valA = parseFloat(document.getElementById(c.id + '_actual').value) || 0;
+                if(valP === 0 && valA === 0) return; // Skip entirely empty rows in snapshot
 
-            // State Rent Insight
-            let avgRent = averageRents[state] || 1800;
-            if (houseVal > 0) {
-                if (houseVal > avgRent * 1.3) {
-                    html += `<li>Your housing cost is quite high. The average rent in <strong>${state}</strong> is around <strong>$${avgRent.toLocaleString()}</strong>.</li>`;
-                } else if (houseVal < avgRent * 0.7) {
-                    html += `<li>Great deal! Your housing cost is significantly lower than the <strong>${state}</strong> average of <strong>$${avgRent.toLocaleString()}</strong>.</li>`;
-                } else {
-                    html += `<li>Your housing cost is right in line with the <strong>${state}</strong> average of <strong>$${avgRent.toLocaleString()}</strong>.</li>`;
-                }
-            } else {
-                 html += `<li>FYI: The average rent in <strong>${state}</strong> is roughly <strong>$${avgRent.toLocaleString()}</strong>.</li>`;
-            }
+                totalP += valP; totalA += valA;
+                let diff = valP - valA;
+                let diffColor = diff < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold";
+                let diffStr = diff < 0 ? `-$${Math.abs(diff)}` : `+$${diff}`;
 
-            // Dining Insight
-            if (foodVal > 0) {
-                if (foodVal > 900) {
-                    html += `<li>You are spending a premium on food! The average individual spends about $350 - $400 a month on dining and groceries.</li>`;
-                } else {
-                    html += `<li>Your food spending ($${foodVal.toLocaleString()}) is tracking well against standard consumer averages.</li>`;
-                }
-            }
+                tableHTML += `
+                    <tr class="border-b border-gray-200">
+                        <td class="py-2 text-sm font-semibold">${c.label}</td>
+                        <td class="py-2 text-sm text-center text-gray-600">$${valP.toLocaleString()}</td>
+                        <td class="py-2 text-sm text-center text-gray-900 font-bold">$${valA.toLocaleString()}</td>
+                        <td class="py-2 text-sm text-right ${diffColor}">${diffStr}</td>
+                    </tr>
+                `;
+            });
 
-            list.innerHTML = html;
+            // Adjust width based on format
+            wrap.style.width = format === 'horizontal' ? '1100px' : '600px';
+
+            // HTML Layout
+            wrap.innerHTML = `
+                <div class="flex justify-between items-center mb-6 pb-4 border-b-2 border-gray-300">
+                    <div>
+                        <h1 class="text-3xl font-black text-gray-900">${monthText}</h1>
+                        <p class="text-gray-500 font-bold">Nonsenseian Finance</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold text-gray-500 uppercase">Monthly Net Income</p>
+                        <p class="text-2xl font-black text-blue-600">$${currentNetMonthly.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <div class="flex ${format === 'horizontal' ? 'flex-row gap-8' : 'flex-col gap-6'}">
+                    <!-- Left/Top Section -->
+                    <div class="${format === 'horizontal' ? 'w-1/3' : 'w-full'} flex flex-col gap-6">
+                        <div class="bg-white p-5 rounded-xl shadow border border-gray-200">
+                            <h3 class="text-sm font-bold text-purple-600 uppercase mb-2">🎯 Goals & Priorities</h3>
+                            <p class="text-gray-800 text-sm whitespace-pre-wrap">${goalsText}</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow border border-gray-200 flex-grow">
+                            <h3 class="text-sm font-bold text-blue-600 uppercase mb-4 text-center">Allocation</h3>
+                            <div class="relative w-full aspect-square max-h-[250px] mx-auto">
+                                <canvas id="snapChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right/Bottom Section -->
+                    <div class="${format === 'horizontal' ? 'w-2/3' : 'w-full'} flex flex-col gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-xs text-gray-400 uppercase tracking-wide border-b-2 border-gray-800">
+                                        <th class="text-left pb-2">Category</th>
+                                        <th class="text-center pb-2">Planned</th>
+                                        <th class="text-center pb-2">Actual</th>
+                                        <th class="text-right pb-2">Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${tableHTML}</tbody>
+                                <tfoot>
+                                    <tr class="font-black bg-gray-50">
+                                        <td class="py-3 px-2">TOTALS</td>
+                                        <td class="text-center text-gray-600">$${totalP.toLocaleString()}</td>
+                                        <td class="text-center text-gray-900">$${totalA.toLocaleString()}</td>
+                                        <td class="text-right ${totalP - totalA < 0 ? 'text-red-600' : 'text-green-600'}">${totalP - totalA < 0 ? '-' : '+'}$${Math.abs(totalP - totalA).toLocaleString()}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        
+                        ${notesText ? `
+                        <div class="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                            <h3 class="text-sm font-bold text-blue-800 uppercase mb-2">📝 Notes</h3>
+                            <p class="text-gray-800 text-sm whitespace-pre-wrap">${notesText}</p>
+                        </div>` : ''}
+                    </div>
+                </div>
+            `;
+
+            // Wait a microtick, then re-render the chart specifically onto the snapshot canvas
+            await new Promise(r => setTimeout(r, 50));
+            
+            const snapCtx = document.getElementById('snapChart').getContext('2d');
+            new Chart(snapCtx, {
+                type: 'doughnut',
+                data: budgetChart.data,
+                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
+                plugins: budgetChart.config.plugins
+            });
+
+            // Capture image
+            html2canvas(wrap, { scale: 2, backgroundColor: null }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Budget_${monthText.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
         }
 
-        // Initialize
-        calculate();
+        // Boot
+        renderCategoryGrid();
     </script>
 </body>
 </html>
