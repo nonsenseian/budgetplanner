@@ -546,10 +546,29 @@
 
             // Capture image
             html2canvas(wrap, { scale: 2, backgroundColor: null }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Budget_${monthText.replace(/\s+/g, '_')}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
+                canvas.toBlob(blob => {
+                    const cleanMonth = monthText.replace(/\s+/g, '_') || 'Snapshot';
+                    const fileName = `Budget_${cleanMonth}.png`;
+                    const file = new File([blob], fileName, { type: 'image/png' });
+
+                    // Use Native iOS/Mobile Share Sheet if available
+                    if (navigator.canShare && navigator.canShare({ files: [file] }) && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                        navigator.share({
+                            files: [file],
+                            title: 'Budget Snapshot'
+                        }).catch(err => console.log('User canceled share', err));
+                    } else {
+                        // Stable Blob URL fallback for PC browsers
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url); // Free up browser memory
+                    }
+                }, 'image/png');
             });
         }
 
