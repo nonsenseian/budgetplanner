@@ -555,7 +555,7 @@
                 }
             }
 
-            // 4. Over State Average (Excluding Savings & Investing)
+            // 4. Over State Average (Excluding Savings, Investing & Custom Categories)
             const baseAvgs = { catHousing: 1800, catGroceries: 400, catDining: 250, catTransport: 500, catUtilities: 200, catWellness: 150, catEntertainment: 150, catTravel: 200, catShopping: 150, catMisc: 150 };
             const stateMults = { 'AL': 0.8, 'CA': 1.4, 'FL': 1.1, 'NY': 1.4, 'TX': 0.9, 'WA': 1.2, 'OTHER': 1.0 };
             let mult = stateMults[state] || 1.0;
@@ -563,8 +563,8 @@
             let topAvgDiffObj = null;
             let highestAvgDiff = 0;
             catsData.forEach(d => {
-                // Skip wealth-building categories!
-                if (d.c.id === 'catSavings' || d.c.id === 'catInvesting') return; 
+                // Skip wealth-building AND custom user categories!
+                if (d.c.id === 'catSavings' || d.c.id === 'catInvesting' || d.c.isCustom) return; 
                 
                 let avg = (baseAvgs[d.c.id] || 150) * mult;
                 let val = d.actual > 0 ? d.actual : d.planned;
@@ -573,6 +573,7 @@
                     topAvgDiffObj = { cat: d.c.label.split(' ')[0], diff: highestAvgDiff, avg: avg };
                 }
             });
+
 
             if (topAvgDiffObj) {
                 if (!isPrivacyMode) {
