@@ -6,6 +6,10 @@
     <title>Nonsenseian | Budget Planner</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://nonsenseian.github.io/global-components.js?v=2"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -20,8 +24,6 @@
             }
         }
     </script>
-    
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- HTML2Canvas for Snapshot Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://nonsenseian.github.io/global-components.js?v=2"></script>
@@ -51,19 +53,27 @@
 
     <main class="flex-grow max-w-7xl mx-auto w-full p-4 md:p-8 block">
         
-        <div class="mb-8 flex justify-between items-end">
+        <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div>
                 <h1 class="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">
                     Dynamic Budget Planner
                 </h1>
                 <p class="text-gray-500 dark:text-gray-400 mt-2">Plan your cash flow and track actual spending.</p>
             </div>
+            
+            <!-- SAFE TO SPEND METRIC -->
+            <div class="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-4 shadow-lg text-white min-w-[200px] text-center border border-green-400/50 relative overflow-hidden">
+                <div class="absolute inset-0 bg-white/10 w-full h-full transform -skew-x-12 -ml-10"></div>
+                <p class="text-xs font-bold uppercase tracking-wider opacity-90 mb-1 relative z-10">Safe to Spend</p>
+                <p class="text-3xl font-black relative z-10" id="safeToSpendMetric">$0</p>
+                <p class="text-[10px] opacity-75 mt-1 relative z-10">Leftover for Discretionary</p>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
             
             <!-- Left Column: Income & Snapshot Settings -->
-            <div class="lg:col-span-1 space-y-6 w-full">
+            <div class="lg:col-span-4 xl:col-span-3 space-y-6 w-full">
                 
                 <!-- Income & Tax Assumptions -->
                 <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border dark:border-darkBorder">
@@ -103,6 +113,10 @@
                             <div>
                                 <label class="block text-sm font-medium mb-1">Annual Salary ($)</label>
                                 <input type="number" id="annualSalary" class="input-field currency-input" value="120000" min="0" oninput="calculate()">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Additional Income ($/yr)</label>
+                                <input type="number" id="additionalIncome" class="input-field currency-input" value="0" min="0" placeholder="e.g., Side Hustle, Bonuses" oninput="calculate()">
                             </div>
                         </div>
 
@@ -162,16 +176,58 @@
                     </div>
                 </div>
 
+                <!-- Savings Goals -->
+                <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border border-gray-200 dark:border-darkBorder">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200 border-b pb-2">Savings Goals 🎯</h2>
+                    <div id="goalsContainer" class="space-y-4 mb-4">
+                        <!-- Goal items generated here -->
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="newGoalName" class="input-field w-1/2 text-sm" placeholder="Goal (e.g. Car)">
+                        <input type="number" id="newGoalTarget" class="input-field w-1/4 text-sm" placeholder="Target $">
+                        <button onclick="addGoal()" class="w-1/4 bg-green-500 text-white font-bold rounded shadow hover:bg-green-600 transition-colors text-xs">
+                            Add
+                        </button>
+                    </div>
+                    <p class="text-xs text-red-500 mt-2 hidden" id="goalError">Please enter a valid name and target > 0.</p>
+                </div>
+
+                <!-- Data Sync & Gamification -->
+                <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border border-gray-200 dark:border-darkBorder">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200 border-b pb-2">Data Sync 💽</h2>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                            <input type="checkbox" id="zbbToggle" class="w-4 h-4 text-blue-600 rounded cursor-pointer" onchange="toggleZBB()">
+                            <label class="text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer" for="zbbToggle">Zero-Based Budgeting Mode</label>
+                        </div>
+                        <p class="text-xs text-gray-500">Export your budget to share with a partner, or drop a Transactions JSON to auto-fill Actuals.</p>
+                        <div class="flex gap-2">
+                            <button onclick="exportBudgetJSON()" class="w-1/2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold rounded shadow hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm py-2">
+                                Export JSON
+                            </button>
+                            <label class="w-1/2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition-colors text-sm py-2 text-center cursor-pointer">
+                                Import JSON
+                                <input type="file" id="importJSONInput" class="hidden" accept=".json" onchange="handleJSONImport(event)">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- Middle Column: Planned vs Actual Input Grid -->
-            <div class="xl:col-span-1 space-y-6">
+            <div class="lg:col-span-8 xl:col-span-4 space-y-6">
                 <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border dark:border-darkBorder">
                     <div class="flex justify-between items-center border-b pb-2 mb-4 border-gray-200 dark:border-darkBorder">
                         <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Budget Flow</h2>
-                        <button onclick="autoFillBudget()" class="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded shadow transition-colors">
-                            ✨ Auto-Fill Planned
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="clearBudgetData()" class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded shadow transition-colors">
+                                🗑️ Clear Data
+                            </button>
+                            <button onclick="autoFillBudget()" class="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded shadow transition-colors">
+                                ✨ Auto-Fill Planned
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- Table Headers -->
@@ -198,13 +254,13 @@
             </div>
 
             <!-- Right Column: Charts & Status -->
-            <div class="xl:col-span-1 space-y-6">
+            <div class="lg:col-span-12 xl:col-span-5 space-y-6">
                 
                 <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border dark:border-darkBorder text-center">
                     <h2 class="text-xl font-bold mb-4">Budget Status</h2>
                     <div class="grid grid-cols-2 gap-4 pb-4 mb-4 border-b dark:border-darkBorder">
                         <div class="bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-700">
-                            <p class="text-[10px] uppercase font-bold text-gray-500">Planned Leftover</p>
+                            <p class="text-[10px] uppercase font-bold text-gray-500" id="plannedLabelUI">Planned Leftover</p>
                             <p class="text-lg font-black" id="leftoverPlannedUI">$0</p>
                         </div>
                         <div class="bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-700">
@@ -213,8 +269,17 @@
                         </div>
                     </div>
                     
-                    <div class="relative w-full aspect-square max-w-[250px] mx-auto mb-4">
-                        <canvas id="budgetChart"></canvas>
+                    <div class="relative w-full h-[450px] mx-auto mb-4">
+                        <div id="budgetChart" class="w-full h-full"></div>
+                    </div>
+                    <!-- Chart Toggle -->
+                    <div class="flex justify-center items-center gap-2 mb-2">
+                        <span class="text-xs font-bold text-blue-600 uppercase" id="toggleLabelActual">Actual</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="chartDataToggle" class="sr-only peer" onchange="calculate()">
+                            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                        </label>
+                        <span class="text-xs font-bold text-gray-500 uppercase" id="toggleLabelPlanned">Planned</span>
                     </div>
                 </div>
 
@@ -229,6 +294,13 @@
                     <div class="mt-auto pt-3 border-t border-gray-200 dark:border-gray-700 text-center">
                         <p class="text-[10px] text-gray-400 dark:text-gray-500">These insights are AI-generated estimates and may contain inaccuracies. This does not constitute official financial advice.</p>
                     </div>
+                </div>
+
+                <!-- Gamification -->
+                <div class="mt-4">
+                    <button onclick="reviewMonth()" class="w-full bg-gradient-to-r from-green-400 to-green-600 text-white font-black py-3 rounded-xl shadow-lg hover:from-green-500 hover:to-green-700 transform transition hover:scale-105">
+                        🎉 Finish & Review Month
+                    </button>
                 </div>
 
             </div>
@@ -254,17 +326,26 @@
         // Base categories
         let categories = [
             { id: 'catHousing', label: 'Housing 🏠', color: '#3B82F6', weight: 0.30, isCustom: false },
+            { id: 'catUtilities', label: 'Utilities ⚡', color: '#F43F5E', weight: 0.05, isCustom: false },
             { id: 'catGroceries', label: 'Groceries 🛒', color: '#10B981', weight: 0.10, isCustom: false },
-            { id: 'catDining', label: 'Dining 🍽️', color: '#F59E0B', weight: 0.08, isCustom: false },
-            { id: 'catTransport', label: 'Transportation 🚗', color: '#6366F1', weight: 0.12, isCustom: false },
-            { id: 'catUtilities', label: 'Utilities 💡', color: '#F43F5E', weight: 0.07, isCustom: false },
-            { id: 'catWellness', label: 'Health & Wellness 🫀', color: '#E11D48', weight: 0.05, isCustom: false },
-            { id: 'catEntertainment', label: 'Entertainment 🍿', color: '#8B5CF6', weight: 0.05, isCustom: false },
-            { id: 'catTravel', label: 'Travel ✈️', color: '#06B6D4', weight: 0.05, isCustom: false },
-            { id: 'catShopping', label: 'Shopping 🛍️', color: '#EC4899', weight: 0.05, isCustom: false },
-            { id: 'catMisc', label: 'Misc. 🧩', color: '#64748B', weight: 0.05, isCustom: false },
+            { id: 'catTransport', label: 'Transportation 🚗', color: '#6366F1', weight: 0.10, isCustom: false },
+            { id: 'catWellness', label: 'Health & Wellness ⚕️', color: '#E11D48', weight: 0.05, isCustom: false },
+            { id: 'catDebt', label: 'Debt Payment 💳', color: '#EF4444', weight: 0.05, isCustom: false },
+            { id: 'catDining', label: 'Dining 🍽️', color: '#F59E0B', weight: 0.05, isCustom: false },
+            { id: 'catPersonalCare', label: 'Personal Care ✂️', color: '#EC4899', weight: 0.02, isCustom: false },
+            { id: 'catEducation', label: 'Education 🎓', color: '#6366F1', weight: 0.02, isCustom: false },
+            { id: 'catPets', label: 'Pets 🐾', color: '#8B5CF6', weight: 0.02, isCustom: false },
+            { id: 'catSubscriptions', label: 'Subscriptions 🔁', color: '#8B5CF6', weight: 0.02, isCustom: false },
+            { id: 'catEntertainment', label: 'Entertainment 🎬', color: '#8B5CF6', weight: 0.02, isCustom: false },
+            { id: 'catTravel', label: 'Travel ✈️', color: '#06B6D4', weight: 0.02, isCustom: false },
+            { id: 'catShopping', label: 'Shopping 🛍️', color: '#EC4899', weight: 0.02, isCustom: false },
+            { id: 'catGifts', label: 'Gifts & Donations 🎁', color: '#F43F5E', weight: 0.01, isCustom: false },
+            { id: 'catFees', label: 'Fees & Charges 🏦', color: '#64748B', weight: 0.01, isCustom: false },
+            { id: 'catP2P', label: 'Peer-to-Peer 💸', color: '#10B981', weight: 0.01, isCustom: false },
+            { id: 'catTransfer', label: 'Internal Transfer 🔄', color: '#64748B', weight: 0.01, isCustom: false },
+            { id: 'catMisc', label: 'Misc. 📦', color: '#64748B', weight: 0.01, isCustom: false },
             { id: 'catSavings', label: 'Savings 💰', color: '#22C55E', weight: 0.10, isCustom: false },
-            { id: 'catInvesting', label: 'Investing 📈', color: '#14B8A6', weight: 0.08, isCustom: false }
+            { id: 'catInvesting', label: 'Investing 📈', color: '#14B8A6', weight: 0.05, isCustom: false }
         ];
 
         const customColors = ['#F97316', '#14B8A6', '#8B5CF6', '#F43F5E', '#EAB308'];
@@ -277,6 +358,243 @@
             'clothes': '👕', 'beauty': '💅', 'hair': '✂️', 'salon': '✂️',
             'game': '🎮', 'sub': '🔄', 'gym': '🏋️', 'insurance': '🛡️'
         };
+
+        // -----------------------
+        // GAMIFICATION, GOALS & ZBB
+        // -----------------------
+        let isZBBMode = false;
+        let savingsGoals = [
+            { id: 'goal1', name: 'Emergency Fund', target: 10000, current: 2500 }
+        ];
+
+        function renderGoals() {
+            const container = document.getElementById('goalsContainer');
+            if(!container) return;
+            container.innerHTML = '';
+            
+            savingsGoals.forEach(g => {
+                let pct = g.target > 0 ? Math.min(100, Math.round((g.current / g.target) * 100)) : 0;
+                container.innerHTML += `
+                    <div class="relative pt-1">
+                        <div class="flex mb-2 items-center justify-between">
+                            <div>
+                                <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-green-600 bg-green-200">
+                                    ${g.name}
+                                </span>
+                            </div>
+                            <div class="text-right flex items-center gap-2">
+                                <input type="number" oninput="updateGoalCurrent('${g.id}', this.value)" value="${g.current}" class="w-16 p-1 text-xs border rounded bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200" placeholder="Saved">
+                                <span class="text-xs font-semibold inline-block text-green-600">
+                                    / $${g.target.toLocaleString()} (${pct}%)
+                                </span>
+                                <button onclick="removeGoal('${g.id}')" class="text-red-500 hover:text-red-700 text-xs font-bold">✕</button>
+                            </div>
+                        </div>
+                        <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-green-200">
+                            <div style="width:${pct}%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function addGoal() {
+            let name = document.getElementById('newGoalName').value;
+            let target = parseFloat(document.getElementById('newGoalTarget').value);
+            if (!name || isNaN(target) || target <= 0) {
+                document.getElementById('goalError').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('goalError').classList.add('hidden');
+            savingsGoals.push({ id: 'goal_' + Date.now(), name: name, target: target, current: 0 });
+            document.getElementById('newGoalName').value = '';
+            document.getElementById('newGoalTarget').value = '';
+            renderGoals();
+        }
+
+        function updateGoalCurrent(id, val) {
+            let goal = savingsGoals.find(g => g.id === id);
+            if(goal) {
+                goal.current = parseFloat(val) || 0;
+                renderGoals();
+            }
+        }
+
+        function removeGoal(id) {
+            savingsGoals = savingsGoals.filter(g => g.id !== id);
+            renderGoals();
+        }
+
+        function toggleZBB() {
+            isZBBMode = document.getElementById('zbbToggle').checked;
+            document.getElementById('plannedLabelUI').innerText = isZBBMode ? "Amount to Assign" : "Planned Leftover";
+            calculate();
+        }
+
+        function saveBudgetData() {
+            let data = {};
+            categories.forEach(c => {
+                let elP = document.getElementById(c.id + '_planned');
+                let elA = document.getElementById(c.id + '_actual');
+                if (elP || elA) {
+                    data[c.id] = { planned: elP ? elP.value : '', actual: elA ? elA.value : '' };
+                }
+            });
+            localStorage.setItem('budgetData', JSON.stringify(data));
+        }
+
+        function loadBudgetData() {
+            let saved = JSON.parse(localStorage.getItem('budgetData') || '{}');
+            categories.forEach(c => {
+                if (saved[c.id]) {
+                    let elP = document.getElementById(c.id + '_planned');
+                    let elA = document.getElementById(c.id + '_actual');
+                    if (elP && saved[c.id].planned) elP.value = saved[c.id].planned;
+                    if (elA && saved[c.id].actual) elA.value = saved[c.id].actual;
+                }
+            });
+            calculate();
+        }
+
+        function clearBudgetData() {
+            if(confirm("Are you sure you want to clear all your planned and actual spending data? This cannot be undone.")) {
+                categories.forEach(c => {
+                    let elP = document.getElementById(c.id + '_planned');
+                    let elA = document.getElementById(c.id + '_actual');
+                    if (elP) elP.value = '';
+                    if (elA) elA.value = '';
+                });
+                localStorage.removeItem('budgetData');
+                calculate();
+            }
+        }
+
+        function reviewMonth() {
+            let leftActual = currentNetMonthly;
+            let totalA = 0;
+
+            categories.forEach(c => {
+                let aVal = parseFloat(document.getElementById(c.id + '_actual').value) || 0;
+                totalA += aVal;
+            });
+
+            leftActual -= totalA;
+
+            if (totalA > 0 && leftActual >= 0) {
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+                alert("Awesome job! Month reviewed.");
+            } else if (totalA === 0) {
+                alert("Fill out your actual spending first!");
+                return;
+            } else {
+                alert("Month reviewed. Be careful, you overspent your total net income!");
+            }
+            
+            // Clear actuals for next month
+            categories.forEach(c => {
+                let elA = document.getElementById(c.id + '_actual');
+                if (elA) elA.value = '';
+            });
+            
+            saveBudgetData();
+            renderCategoryGrid();
+            loadBudgetData(); // Restore planned data into newly rendered grid
+        }
+
+        // -----------------------
+        // DATA SYNC & IMPORT
+        // -----------------------
+        function exportBudgetJSON() {
+            let data = {
+                annualSalary: document.getElementById('annualSalary').value,
+                additionalIncome: document.getElementById('additionalIncome').value,
+                savingsGoals: savingsGoals,
+                categories: categories.map(c => ({
+                    id: c.id,
+                    planned: document.getElementById(c.id + '_planned').value || 0,
+                    actual: document.getElementById(c.id + '_actual').value || 0
+                }))
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "nonsenseian_budget_sync.json";
+            link.click();
+        }
+
+        function handleJSONImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            processImportFile(file);
+        }
+
+        function processImportFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    // Check if it's a Budget Sync file
+                    if (json.categories && json.annualSalary !== undefined) {
+                        document.getElementById('annualSalary').value = json.annualSalary;
+                        document.getElementById('additionalIncome').value = json.additionalIncome || 0;
+                        if(json.savingsGoals) {
+                            savingsGoals = json.savingsGoals;
+                            renderGoals();
+                        }
+                        json.categories.forEach(jc => {
+                            let elP = document.getElementById(jc.id + '_planned');
+                            let elA = document.getElementById(jc.id + '_actual');
+                            if (elP) elP.value = jc.planned;
+                            if (elA) elA.value = jc.actual;
+                        });
+                        alert("Budget Sync imported successfully!");
+                        calculate();
+                    } 
+                    // Check if it's a Transaction tool export
+                    else if (Array.isArray(json) && json[0] && json[0].category !== undefined) {
+                        let actualSums = {};
+                        json.forEach(txn => {
+                            if (txn.type === 'Expense') {
+                                let catWord = txn.category.split(' ')[0];
+                                let match = categories.find(c => c.label.includes(catWord));
+                                if (match) {
+                                    actualSums[match.id] = (actualSums[match.id] || 0) + parseFloat(txn.amount);
+                                } else {
+                                    actualSums['catMisc'] = (actualSums['catMisc'] || 0) + parseFloat(txn.amount);
+                                }
+                            }
+                        });
+                        
+                        for (let id in actualSums) {
+                            let elA = document.getElementById(id + '_actual');
+                            if (elA) elA.value = Math.round(actualSums[id]);
+                        }
+                        alert("Transaction Actuals imported successfully!");
+                        calculate();
+                    } else {
+                        alert("Unrecognized JSON format.");
+                    }
+                } catch (err) {
+                    alert("Error parsing JSON file.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Drag and Drop for JSON
+        document.addEventListener('dragover', (e) => { e.preventDefault(); document.body.style.opacity = '0.7'; });
+        document.addEventListener('dragleave', (e) => { e.preventDefault(); document.body.style.opacity = '1'; });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.body.style.opacity = '1';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processImportFile(e.dataTransfer.files[0]);
+            }
+        });
 
         // -----------------------
         // UI & PRIVACY RENDERING
@@ -299,21 +617,28 @@
         function renderCategoryGrid() {
             const container = document.getElementById('budgetInputsContainer');
             container.innerHTML = '';
-            
+
             categories.forEach(c => {
                 const deleteBtn = c.isCustom ? `<button onclick="removeCustomCategory('${c.id}')" class="absolute -left-4 top-2 text-red-500 hover:text-red-700 text-xs">✕</button>` : '';
-                
+
                 container.innerHTML += `
-                    <div class="grid grid-cols-12 gap-2 items-center relative">
+                    <div class="mb-4 relative group">
                         ${deleteBtn}
-                        <label class="col-span-4 text-xs font-semibold truncate pr-1" title="${c.label}">${c.label}</label>
-                        <div class="col-span-4 relative">
-                            <span class="absolute left-2 top-[6px] text-gray-400 text-xs">$</span>
-                            <input type="number" id="${c.id}_planned" class="input-field currency-input pl-5 py-1 text-sm font-semibold" placeholder="0" oninput="calculate()">
+                        <div class="grid grid-cols-12 gap-2 items-center mb-1">
+                            <label class="col-span-4 text-xs font-semibold truncate pr-1 flex items-center" title="${c.label}">
+                                ${c.label}
+                            </label>
+                            <div class="col-span-4 relative">
+                                <span class="absolute left-2 top-[6px] text-gray-400 text-xs">$</span>
+                                <input type="number" id="${c.id}_planned" class="input-field currency-input pl-5 py-1 text-sm font-semibold bg-gray-50" placeholder="0" oninput="calculate()">
+                            </div>
+                            <div class="col-span-4 relative">
+                                <span class="absolute left-2 top-[6px] text-gray-400 text-xs">$</span>
+                                <input type="number" id="${c.id}_actual" class="input-field currency-input pl-5 py-1 text-sm font-semibold" placeholder="0" oninput="calculate()">
+                            </div>
                         </div>
-                        <div class="col-span-4 relative">
-                            <span class="absolute left-2 top-[6px] text-gray-400 text-xs">$</span>
-                            <input type="number" id="${c.id}_actual" class="input-field currency-input pl-5 py-1 text-sm font-semibold" placeholder="0" oninput="calculate()">
+                        <div class="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
+                            <div id="${c.id}_progress" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
                         </div>
                     </div>
                 `;
@@ -393,6 +718,7 @@
 
             if (payType === 'salary') {
                 annualGross = parseFloat(document.getElementById('annualSalary').value) || 0;
+                annualGross += parseFloat(document.getElementById('additionalIncome').value) || 0;
             } else {
                 let wage = parseFloat(document.getElementById('hourlyWage').value) || 0;
                 let hrs = parseFloat(document.getElementById('hoursPerWeek').value) || 0;
@@ -439,10 +765,18 @@
             currentNetMonthly = Math.round(netAnnual / 12);
             document.getElementById('takeHomeReadout').innerText = formatMoney(currentNetMonthly);
 
-            // Allocations
+            // Allocations & Progress Bars
             let totalPlanned = 0, totalActual = 0;
             let chartData = [], chartLabels = [], chartColors = [];
             let categoriesData = []; // Passed to insights
+            
+            let chartToggle = document.getElementById('chartDataToggle');
+            let usePlannedForChart = chartToggle ? chartToggle.checked : false;
+            
+            if (chartToggle) {
+                document.getElementById('toggleLabelActual').className = !usePlannedForChart ? "text-xs font-bold text-blue-600 uppercase transition-colors" : "text-xs font-bold text-gray-500 uppercase transition-colors";
+                document.getElementById('toggleLabelPlanned').className = usePlannedForChart ? "text-xs font-bold text-blue-600 uppercase transition-colors" : "text-xs font-bold text-gray-500 uppercase transition-colors";
+            }
 
             categories.forEach(c => {
                 let elP = document.getElementById(c.id + '_planned');
@@ -453,47 +787,151 @@
                 totalPlanned += valP; totalActual += valA;
                 categoriesData.push({ c: c, planned: valP, actual: valA });
 
-                if (valP > 0) {
-                    chartData.push(valP);
+                let valForChart = usePlannedForChart ? valP : valA;
+                if (valForChart > 0) {
+                    chartData.push(valForChart);
                     chartLabels.push(c.label);
                     chartColors.push(c.color);
                 }
+                
+                // Progress Bar Update
+                let effectiveBudget = valP;
+                let pct = effectiveBudget > 0 ? (valA / effectiveBudget) * 100 : (valA > 0 ? 100 : 0);
+                
+                let pBar = document.getElementById(c.id + '_progress');
+                if (pBar) {
+                    pBar.style.width = Math.min(100, pct) + '%';
+                    
+                    let isInverted = c.id === 'catSavings' || c.id === 'catInvesting';
+                    
+                    if (!isInverted) {
+                        if (pct < 75) {
+                            pBar.className = "h-full transition-all duration-300 bg-green-500";
+                        } else if (pct < 100) {
+                            pBar.className = "h-full transition-all duration-300 bg-yellow-400";
+                        } else {
+                            pBar.className = "h-full transition-all duration-300 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
+                        }
+                    } else {
+                        if (pct < 75) {
+                            pBar.className = "h-full transition-all duration-300 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
+                        } else if (pct < 100) {
+                            pBar.className = "h-full transition-all duration-300 bg-yellow-400";
+                        } else {
+                            pBar.className = "h-full transition-all duration-300 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+                        }
+                    }
+                }
             });
+            
+            // Safe to Spend Calculation
+            let fixedAndSavings = 0;
+            const discretionaryCats = ['catDining', 'catEntertainment', 'catTravel', 'catShopping', 'catPersonalCare', 'catMisc'];
+            
+            categoriesData.forEach(d => {
+                if (!discretionaryCats.includes(d.c.id)) {
+                    fixedAndSavings += d.planned;
+                }
+            });
+            
+            let safeToSpend = Math.max(0, currentNetMonthly - fixedAndSavings);
+            let safeActualRemaining = safeToSpend; 
+            categoriesData.forEach(d => {
+                if (discretionaryCats.includes(d.c.id)) {
+                    safeActualRemaining -= d.actual;
+                }
+            });
+            
+            let safeMetricEl = document.getElementById('safeToSpendMetric');
+            if(safeMetricEl) {
+                safeMetricEl.innerText = formatMoney(safeActualRemaining);
+            }
 
             let leftPlanned = currentNetMonthly - totalPlanned;
             let leftActual = currentNetMonthly - totalActual;
 
             let uiP = document.getElementById('leftoverPlannedUI');
-            uiP.innerText = leftPlanned < 0 ? `-${formatMoney(Math.abs(leftPlanned))}` : formatMoney(leftPlanned);
-            uiP.className = leftPlanned < 0 ? "text-lg font-black text-red-600 dark:text-red-400" : "text-lg font-black text-blue-600 dark:text-blue-400";
+            if (isZBBMode) {
+                uiP.innerText = formatMoney(leftPlanned);
+                uiP.className = leftPlanned === 0 ? "text-lg font-black text-green-600 dark:text-green-400" : "text-lg font-black text-red-600 dark:text-red-400";
+            } else {
+                uiP.innerText = leftPlanned < 0 ? `-${formatMoney(Math.abs(leftPlanned))}` : formatMoney(leftPlanned);
+                uiP.className = leftPlanned < 0 ? "text-lg font-black text-red-600 dark:text-red-400" : "text-lg font-black text-blue-600 dark:text-blue-400";
+            }
 
             let uiA = document.getElementById('leftoverActualUI');
             uiA.innerText = leftActual < 0 ? `-${formatMoney(Math.abs(leftActual))}` : formatMoney(leftActual);
             uiA.className = leftActual < 0 ? "text-lg font-black text-red-600 dark:text-red-400" : "text-lg font-black text-green-600 dark:text-green-400";
 
-            if (budgetChart) budgetChart.destroy();
-            let ctx = document.getElementById('budgetChart').getContext('2d');
-            budgetChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors, borderWidth: 2 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
-                plugins: [{
-                    id: 'sliceEmojis',
-                    afterDatasetsDraw(chart) {
-                        const c = chart.ctx;
-                        chart.getDatasetMeta(0).data.forEach((dp, i) => {
-                            if (dp.circumference > 0.15) {
-                                c.save(); c.font = '16px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-                                c.shadowColor = 'rgba(0,0,0,0.4)'; c.shadowBlur = 4;
-                                c.fillText(chart.data.labels[i].split(' ').pop(), dp.tooltipPosition().x, dp.tooltipPosition().y);
-                                c.restore();
-                            }
-                        });
+            const container = document.getElementById('budgetChart');
+            if (!budgetChart) {
+                budgetChart = echarts.init(container);
+                window.addEventListener('resize', () => {
+                    if (budgetChart) budgetChart.resize();
+                });
+            } else {
+                budgetChart.resize();
+            }
+
+            let eData = [];
+            for(let i=0; i<chartData.length; i++) {
+                eData.push({ value: chartData[i], name: chartLabels[i], itemStyle: { color: chartColors[i] } });
+            }
+
+            let isDark = document.documentElement.classList.contains('dark');
+            let textColor = isDark ? '#F3F4F6' : '#111827';
+
+            let option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        return `<div style="font-family:sans-serif;">
+                            <strong>${params.name}</strong><br/>
+                            Allocated: $${params.value.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}<br/>
+                            Share: ${params.percent}%
+                        </div>`;
                     }
-                }]
-            });
+                },
+                series: [
+                    {
+                        name: 'Allocation',
+                        type: 'pie',
+                        radius: ['30%', '50%'],
+                        center: ['50%', '50%'],
+                        avoidLabelOverlap: true,
+                        hoverOffset: 15,
+                        minAngle: 10,
+                        itemStyle: {
+                            borderRadius: 6,
+                            borderColor: isDark ? '#1F2937' : '#ffffff',
+                            borderWidth: 2
+                        },
+                        label: {
+                            show: true,
+                            position: 'outside',
+                            color: textColor,
+                            fontSize: 12,
+                            fontWeight: 'bold',
+                            formatter: '{b}\n{d}%'
+                        },
+                        labelLine: {
+                            show: true,
+                            length: 5,
+                            length2: 10,
+                            smooth: true,
+                            lineStyle: { width: 2, color: textColor }
+                        },
+                        data: eData
+                    }
+                ]
+            };
+            budgetChart.setOption(option);
 
             generateInsights(state, categoriesData);
+            
+            if (typeof saveBudgetData === 'function') {
+                saveBudgetData();
+            }
         }
 
         // -----------------------
@@ -660,8 +1098,8 @@
                         </div>
                         <div class="bg-white p-5 rounded-xl shadow border border-gray-200 flex-grow">
                             <h3 class="text-sm font-bold text-blue-600 uppercase mb-4 text-center">Allocation</h3>
-                            <div class="relative w-full aspect-square max-h-[250px] mx-auto">
-                                <canvas id="snapChart"></canvas>
+                            <div class="relative w-full h-[300px] mx-auto">
+                                <div id="snapChart" class="w-full h-full"></div>
                             </div>
                         </div>
                     </div>
@@ -699,13 +1137,22 @@
             `;
 
             await new Promise(r => setTimeout(r, 50));
-            const snapCtx = document.getElementById('snapChart').getContext('2d');
-            new Chart(snapCtx, {
-                type: 'doughnut',
-                data: budgetChart.data,
-                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
-                plugins: budgetChart.config.plugins
-            });
+            const snapContainer = document.getElementById('snapChart');
+            if(snapContainer && budgetChart) {
+                let snapEChart = echarts.init(snapContainer);
+                let snapOption = budgetChart.getOption();
+                
+                // Ensure text colors are visible on light background snapshot
+                if(snapOption.series && snapOption.series.length > 0) {
+                    snapOption.series[0].label.color = '#111827';
+                    snapOption.series[0].labelLine.lineStyle.color = '#111827';
+                    snapOption.series[0].itemStyle.borderColor = '#ffffff';
+                }
+                
+                // Disable animation for snapshot
+                snapOption.animation = false;
+                snapEChart.setOption(snapOption);
+            }
 
             html2canvas(wrap, { scale: 2, backgroundColor: null }).then(canvas => {
                 canvas.toBlob(blob => {
@@ -728,6 +1175,18 @@
 
         // Boot
         renderCategoryGrid();
+        loadBudgetData();
+        renderGoals();
+
+        // Theme Toggle Observer to redraw charts with correct text colors
+        const themeObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    if (typeof calculate === 'function') calculate();
+                }
+            });
+        });
+        themeObserver.observe(document.documentElement, { attributes: true });
     </script>
 </body>
 </html>
