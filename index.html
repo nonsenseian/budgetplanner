@@ -745,7 +745,8 @@
             }
 
             // Taxes
-            let taxable = Math.max(0, annualGross - contrib401k);
+            let stdDed = status === 'joint' ? 29200 : 14600;
+            let taxable = Math.max(0, annualGross - contrib401k - stdDed);
             let fed = 0;
             let brackets = status === 'joint' ? [[23200, 0.1], [94300, 0.12], [201050, 0.22], [383900, 0.24], [487450, 0.32], [731200, 0.35], [Infinity, 0.37]] : [[11600, 0.1], [47150, 0.12], [100525, 0.22], [191950, 0.24], [243725, 0.32], [365600, 0.35], [Infinity, 0.37]];
             let prev = 0;
